@@ -1,0 +1,47 @@
+#! /usr/bin/env python
+
+# A script that uses the docx library to extract text from docx files. Then tokenizes the files and accumulates wordcounts
+
+import codecs, collections, glob, json, string, os
+import regex, docx
+# not the docx module installed into lib- must have the specific docx file in the same folder as this script. The distributed version on github is weird.
+
+outfilename = "out_json_wordcounts.txt"
+
+def contents_docx( filename ):
+	paragraphs = docx.getdocumenttext( docx.opendocx( filename ) )
+	#filecontents = '\n'.join( p.encode("UTF-8") for p in paragraphs) 
+	filecontents = ' '.join( paragraphs )
+	return filecontents
+
+def get_file( filename ):
+	if os.path.splitext( filename )[1] == ".docx":
+		return contents_docx( filename )
+	else:
+		# If we're only searching for docx files with glob, this code will never run 
+		with codecs.open( filename , "r" , "utf-8" ) as f:
+			return f.read()
+
+if __name__ == "__main__":
+	filelist = glob.glob( "documents/*.docx" )
+
+	allfiles = { "files": {} , "words": collections.Counter()  }
+
+	for filename in filelist:
+		contents = get_file( filename )	
+
+		# Strip punctuation: http://stackoverflow.com/questions/11066400/remove-punctation-from-unicode-formatted-strings
+		#contents = regex.sub(ur"\p{P}+", " ", contents )
+		wordlist = regex.compile("([\w][\w']*\w)").findall( contents )
+		
+		# Get wordcounts
+		wordlist = [ w.lower() for w in wordlist ]
+		
+		wc = collections.Counter( wordlist )
+	
+		# Store data
+		allfiles[ "files" ][ filename ]  =  { "wordcounts": wc , "numwords": sum( wc.values() ) }
+		allfiles[ "words" ] 		+= collections.Counter( wc.keys() )
+
+	with open( outfilename , "w" ) as f:
+		f.write( json.dumps( allfiles ) )
